@@ -686,6 +686,14 @@ class _UnslothGRPOTrainer(Trainer):
             model = model
 
         # Reference model
+        # deepspeed zero3用于减少内存使用
+        # peft用于参数高效调参
+        # 如果没有使用PEFT配置，
+        # 则通过调用create_reference_model(model)基于初始模型创建一个参考模型。
+        # 这个参考模型可以在训练过程中用于比较或计算损失等目的。
+        # 如果使用了PEFT方法，则不需要额外创建参考模型。
+        # 这是因为PEFT允许通过禁用适配器（adapter）来恢复到初始模型状态。
+        # 在这种情况下，self.ref_model被设置为None
         if is_deepspeed_zero3_enabled():
             self.ref_model = AutoModelForCausalLM.from_pretrained(model_id, **model_init_kwargs)
         elif not is_peft_model(model):
@@ -697,6 +705,7 @@ class _UnslothGRPOTrainer(Trainer):
             self.ref_model = None
 
         # Processing class
+        # 初始化文本处理类
         if processing_class is None:
             processing_class = AutoTokenizer.from_pretrained(model.config._name_or_path, padding_side="left")
 
@@ -711,6 +720,7 @@ class _UnslothGRPOTrainer(Trainer):
         self.reward_funcs = reward_funcs
 
         # Reward weights
+        # 对于奖励函数的权重，我们可以通过reward_weights参数来指定，如果没有指定，则默认所有的奖励函数权重都是1
         if args.reward_weights is not None:
             if len(args.reward_weights) != len(reward_funcs):
                 raise ValueError(
